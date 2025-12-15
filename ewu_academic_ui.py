@@ -5,7 +5,7 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
-#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
+
 class EWUAcademicUI:
     """Streamlit UI for EWU Academic Assistant"""
     
@@ -50,147 +50,201 @@ Provide a friendly, helpful answer. Use the context when relevant, but feel free
         st.set_page_config(
             page_title="EWU Academic Assistant",
             page_icon="🎓",
-            layout="wide"
+            layout="centered",
+            initial_sidebar_state="expanded"
         )
         self.apply_theme()
     
     def apply_theme(self):
-        """Apply EWU theme with ChatGPT-style CSS"""
+        """Apply EWU theme with ChatGPT-style responsive layout"""
         st.markdown(f"""
         <style>
-        * {{
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }}
-        
-        html, body, [data-testid="stAppViewContainer"] {{
-            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        /* ===== Base Layout ===== */
+        html, body {{
             height: 100%;
+            overflow-x: hidden;
         }}
         
+        [data-testid="stAppViewContainer"] {{
+            height: 100vh;
+            display: flex;
+            flex-direction: row;
+            background: linear-gradient(135deg, #e8eef7 0%, #f0f2f5 100%);
+        }}
+        
+        /* ===== Sidebar - EWU Gradient ===== */
+        [data-testid="stSidebar"] {{
+            height: 100vh;
+            overflow-y: auto;
+            background: linear-gradient(180deg, {self.ewu_primary} 0%, {self.ewu_secondary} 100%) !important;
+        }}
+        
+        [data-testid="stSidebarContent"] {{
+            background: transparent !important;
+        }}
+        
+        [data-testid="stSidebarUserContent"] {{
+            background: transparent !important;
+            padding-bottom: 100px;
+        }}
+        
+        .stSidebar [data-testid="stMarkdownContainer"] {{
+            color: white;
+        }}
+        
+        .stSidebar h3 {{
+            color: white !important;
+            font-weight: 600 !important;
+        }}
+        
+        .stSidebar p {{
+            color: rgba(255, 255, 255, 0.95) !important;
+        }}
+        
+        .stSidebar [data-testid="stButton"] button {{
+            background-color: rgba(255, 255, 255, 0.15) !important;
+            color: white !important;
+            border: 1px solid rgba(255, 255, 255, 0.3) !important;
+            font-weight: 600 !important;
+            width: 100%;
+        }}
+        
+        .stSidebar [data-testid="stButton"] button:hover {{
+            background-color: rgba(255, 255, 255, 0.25) !important;
+        }}
+        
+        /* ===== Main Chat Area - Flexbox ===== */
+        [role="main"] {{
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            overflow: hidden;
+            flex: 1;
+        }}
+        
+        [data-testid="stMainBlockContainer"] {{
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            background: transparent;
+            padding: 0;
+            margin: 0;
+        }}
+        
+        /* Chat history scroll area */
         [data-testid="stChatMessageContainer"] {{
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px 120px 24px;
+            max-width: 900px;
+            margin: 0 auto;
+            width: 100%;
             background: transparent;
         }}
         
         .stChatMessage {{
             background: transparent !important;
-            padding: 0 !important;
+            padding: 8px 0 !important;
         }}
         
-        [data-testid="stChatMessage"] {{
-            background: transparent;
-        }}
-        
-        /* User message styling */
-        [data-testid="stChatMessage"]:has([data-testid="stChatMessageContent"]) {{
-            background: transparent;
-        }}
-        
-        .user-message {{
-            display: flex;
-            justify-content: flex-end;
-            margin: 12px 0;
-        }}
-        
-        .user-message-content {{
-            background: {self.ewu_primary};
-            color: white;
-            padding: 12px 16px;
-            border-radius: 18px;
-            max-width: 70%;
-            word-wrap: break-word;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-        }}
-        
-        .assistant-message {{
-            display: flex;
-            justify-content: flex-start;
-            margin: 12px 0;
-        }}
-        
-        .assistant-message-content {{
-            background: white;
-            color: #333;
-            padding: 12px 16px;
-            border-radius: 18px;
-            border: 1px solid #e0e0e0;
-            max-width: 70%;
-            word-wrap: break-word;
-            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-        }}
-        
+        /* Header styling */
         .header-title {{
             color: {self.ewu_primary};
             text-align: center;
             font-size: 2.5em;
-            font-weight: bold;
-            margin-bottom: 10px;
-            margin-top: 20px;
+            font-weight: 700;
+            margin: 30px 0 5px 0;
+            letter-spacing: -0.5px;
         }}
         
         .header-subtitle {{
             color: {self.ewu_secondary};
             text-align: center;
-            font-size: 1.1em;
-            margin-bottom: 30px;
+            font-size: 1em;
+            margin-bottom: 20px;
             font-weight: 500;
         }}
         
+        /* ===== Chat Input - Sticky (ChatGPT Style) ===== */
         [data-testid="stChatInput"] {{
-            position: fixed;
+            position: sticky;
             bottom: 0;
-            left: 0;
-            right: 0;
-            background: white;
-            border-top: 1px solid #e0e0e0;
-            padding: 16px;
-            box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-            z-index: 100;
+            background: linear-gradient(180deg, rgba(248, 249, 250, 0) 0%, white 30%, white 100%);
+            padding: 12px 20px 16px 20px;
+            border-top: 1px solid #e5e7eb;
+            box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+            z-index: 10;
         }}
         
         [data-testid="stChatInputContainer"] {{
             max-width: 900px;
             margin: 0 auto;
+            width: 100%;
+            padding: 0 20px;
         }}
         
+        .stChatInputTextArea {{
+            width: 100% !important;
+        }}
+        
+        /* Input field styling */
         .stChatInputTextArea textarea {{
-            border-radius: 24px !important;
+            border-radius: 18px !important;
             border: 1px solid #d1d5db !important;
-            padding: 12px 16px !important;
-            font-size: 15px !important;
+            padding: 10px 14px !important;
+            font-size: 14px !important;
             resize: none !important;
-            max-height: 150px !important;
+            max-height: 100px !important;
+            background: #f9fafb !important;
         }}
         
         .stChatInputTextArea textarea:focus {{
             border-color: {self.ewu_primary} !important;
             box-shadow: 0 0 0 3px rgba(0, 61, 122, 0.1) !important;
+            background: white !important;
         }}
         
-        .main {{
-            padding-bottom: 100px;
+        .stChatInputTextArea textarea::placeholder {{
+            color: #9ca3af !important;
         }}
         
-        .info-box {{
-            background-color: {self.ewu_primary}15;
-            border-left: 4px solid {self.ewu_primary};
-            padding: 15px;
-            border-radius: 8px;
-            margin: 20px 0;
+        /* ===== Scrollbar ===== */
+        ::-webkit-scrollbar {{
+            width: 6px;
         }}
         
-        .stButton > button {{
-            background-color: {self.ewu_primary};
-            color: white;
-            border: none;
-            border-radius: 8px;
-            padding: 10px 20px;
-            font-weight: 500;
+        ::-webkit-scrollbar-track {{
+            background: transparent;
         }}
         
-        .stButton > button:hover {{
-            background-color: {self.ewu_secondary};
+        ::-webkit-scrollbar-thumb {{
+            background: {self.ewu_primary}40;
+            border-radius: 4px;
+        }}
+        
+        ::-webkit-scrollbar-thumb:hover {{
+            background: {self.ewu_primary}60;
+        }}
+        
+        /* Divider */
+        .stDivider {{
+            margin: 15px 0 !important;
+            border-color: rgba(255, 255, 255, 0.2) !important;
+        }}
+        
+        /* Responsive adjustments */
+        @media (max-width: 768px) {{
+            [data-testid="stChatMessageContainer"] {{
+                padding: 15px 16px 120px 16px;
+            }}
+            
+            .header-title {{
+                font-size: 2em;
+            }}
+            
+            .header-subtitle {{
+                font-size: 0.9em;
+            }}
         }}
         </style>
         """, unsafe_allow_html=True)
@@ -232,12 +286,11 @@ Provide a friendly, helpful answer. Use the context when relevant, but feel free
         )
     
     def create_qa_chain(self, db):
-        """Create RetrievalQA chain"""
+        """Create RAG chain"""
         llm = self.get_llm()
         prompt = self.get_prompt_template()
         retriever = db.as_retriever(search_kwargs={'k': 3})
         
-        # Create RAG chain using modern langchain approach
         rag_chain = (
             {"context": retriever, "question": RunnablePassthrough()}
             | prompt
@@ -245,29 +298,14 @@ Provide a friendly, helpful answer. Use the context when relevant, but feel free
         )
         return rag_chain
     
-    def render_header(self):
-        """Render page header"""
-        st.markdown('<div class="header-title">🎓 EWU Academic Assistant</div>', unsafe_allow_html=True)
-        st.markdown('<div class="header-subtitle">Retrieval-Augmented Q&A System for East West University</div>', unsafe_allow_html=True)
-    
     def check_prerequisites(self):
         """Check system prerequisites"""
         if not os.path.exists(self.db_path):
-            st.markdown("""
-            <div class="error-box">
-            <b>⚠️ Vector Database Not Found</b><br>
-            Please run <code>connect_memory_with_llm.py</code> to create the vector store from your documents.
-            </div>
-            """, unsafe_allow_html=True)
+            st.error("⚠️ Vector Database Not Found. Please run connect_memory_with_llm.py first.")
             return False
         
         if not self.groq_api_key or self.groq_api_key == "your_api_key_here":
-            st.markdown("""
-            <div class="error-box">
-            <b>⚠️ API Key Missing</b><br>
-            Please configure your Groq API key in the code.
-            </div>
-            """, unsafe_allow_html=True)
+            st.error("⚠️ API Key Missing. Please configure your Groq API key.")
             return False
         
         return True
@@ -302,7 +340,7 @@ Provide a friendly, helpful answer. Use the context when relevant, but feel free
             st.session_state.conversations[st.session_state.current_conversation_id] = st.session_state.messages
     
     def display_chat_history(self):
-        """Display chat message history in ChatGPT style"""
+        """Display chat message history"""
         for msg in st.session_state.messages:
             with st.chat_message(msg["role"], avatar="👤" if msg["role"] == "user" else "🤖"):
                 st.markdown(msg["content"])
@@ -320,7 +358,6 @@ Provide a friendly, helpful answer. Use the context when relevant, but feel free
                     qa_chain = self.create_qa_chain(db)
                     response = qa_chain.invoke(prompt)
                     
-                    # Extract text content from response
                     if hasattr(response, 'content'):
                         result = response.content
                     else:
@@ -330,14 +367,12 @@ Provide a friendly, helpful answer. Use the context when relevant, but feel free
                     st.session_state.messages.append({"role": "assistant", "content": result})
                             
             except Exception as e:
-                error_msg = f"❌ Sorry, I encountered an error: {str(e)}"
+                error_msg = f"❌ Error: {str(e)}"
                 st.error(error_msg)
-                st.session_state.messages.append({"role": "assistant", "content": error_msg})
     
     def run(self):
         """Run the Streamlit application"""
         self.configure_page()
-        self.apply_theme()
         
         if not self.check_prerequisites():
             st.stop()
@@ -346,28 +381,24 @@ Provide a friendly, helpful answer. Use the context when relevant, but feel free
         
         # Sidebar
         with st.sidebar:
-            st.markdown(f"<div style='color: {self.ewu_primary}; font-size: 1.8em; font-weight: bold;'>💬 EWU Chat</div>", unsafe_allow_html=True)
-            st.divider()
+            st.markdown(f"<div style='color: white; font-size: 1.8em; font-weight: 700; margin-bottom: 20px;'>💬 EWU Chat</div>", unsafe_allow_html=True)
             
-            # New chat button
-            if st.button("+ New Chat", use_container_width=True, key="new_chat"):
+            if st.button("✨ New Chat", use_container_width=True, key="new_chat"):
                 self.create_new_conversation()
             
             st.divider()
             
-            # Chat history
-            st.markdown("### 📚 Chat History")
+            st.markdown("<h3 style='color: white;'>📚 Chat History</h3>", unsafe_allow_html=True)
             if st.session_state.conversations:
                 for conv_id in reversed(list(st.session_state.conversations.keys())):
                     messages = st.session_state.conversations[conv_id]
                     if messages:
-                        # Get first user message as title
-                        first_msg = next((m["content"][:30] + "..." if len(m["content"]) > 30 else m["content"] 
+                        first_msg = next((m["content"][:25] + "..." if len(m["content"]) > 25 else m["content"] 
                                          for m in messages if m["role"] == "user"), "New Chat")
                         
                         col1, col2 = st.columns([4, 1])
                         with col1:
-                            if st.button(first_msg, use_container_width=True, key=conv_id):
+                            if st.button(f"💬 {first_msg}", use_container_width=True, key=conv_id):
                                 self.load_conversation(conv_id)
                         with col2:
                             if st.button("🗑️", key=f"del_{conv_id}"):
@@ -377,39 +408,34 @@ Provide a friendly, helpful answer. Use the context when relevant, but feel free
                                     st.session_state.messages = []
                                 st.rerun()
             else:
-                st.markdown("*No conversations yet*")
+                st.markdown("<p style='color: rgba(255,255,255,0.7);'>No chats yet</p>", unsafe_allow_html=True)
             
             st.divider()
-            
-            st.markdown("### About")
             st.markdown("""
-            **EWU Academic Assistant**
-            
-            Ask about:
-            - 📚 Courses & programs
-            - 🎓 Requirements
-            - 📋 Policies
-            - 👨‍🏫 Faculty info
-            """)
+            <div style='color: rgba(255,255,255,0.95); font-size: 13px;'>
+            <b>📚 About</b><br><br>
+            Your AI guide for:<br>
+            • Courses<br>
+            • Programs<br>
+            • Policies<br>
+            • Faculty Info
+            </div>
+            """, unsafe_allow_html=True)
         
-        # Main chat area
+        # Main content - Headers inside scrollable area (ChatGPT style)
         st.markdown('<div class="header-title">🎓 EWU Academic Assistant</div>', unsafe_allow_html=True)
         st.markdown('<div class="header-subtitle">Your AI Guide for Academic Success</div>', unsafe_allow_html=True)
         
         db = self.load_vectorstore()
-        
         if db is None:
             st.stop()
         
-        # Create conversation if none exists
         if st.session_state.current_conversation_id is None:
             self.create_new_conversation()
         
-        # Display chat history
         self.display_chat_history()
         
-        # Chat input
-        if prompt := st.chat_input("Ask me anything about EWU courses, programs, or policies..."):
+        if prompt := st.chat_input("Ask me anything about EWU..."):
             self.process_user_input(prompt, db)
             self.save_current_conversation()
 
