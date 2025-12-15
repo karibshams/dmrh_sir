@@ -1,7 +1,7 @@
 import streamlit as st
 import os
 from langchain_core.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
+from langchain_core.runnables import RunnablePassthrough
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
@@ -141,13 +141,16 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
     def create_qa_chain(self, db):
         """Create RetrievalQA chain"""
         llm = self.get_llm()
-        return RetrievalQA.from_chain_type(
-            llm=llm,
-            chain_type="stuff",
-            retriever=db.as_retriever(search_kwargs={'k': 3}),
-            return_source_documents=True,
-            chain_type_kwargs={'prompt': self.get_prompt_template()}
+        prompt = self.get_prompt_template()
+        retriever = db.as_retriever(search_kwargs={'k': 3})
+        
+        # Create RAG chain using modern langchain approach
+        rag_chain = (
+            {"context": retriever, "question": RunnablePassthrough()}
+            | prompt
+            | llm
         )
+        return rag_chain
     
     def render_header(self):
         """Render page header"""
@@ -198,17 +201,10 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
             try:
                 with st.spinner("🔍 Searching documents..."):
                     qa_chain = self.create_qa_chain(db)
-                    response = qa_chain.invoke({'query': prompt})
-                    result = response["result"]
+                    result = qa_chain.invoke(prompt)
                     
                     st.markdown(result)
                     st.session_state.messages.append({"role": "assistant", "content": result})
-                    
-                    with st.expander("📄 View Source Documents"):
-                        for i, doc in enumerate(response["source_documents"], 1):
-                            st.write(f"**Document {i}:** {doc.metadata.get('source', 'Unknown')}")
-                            st.write(f"_{doc.page_content[:250]}..._")
-                            st.write("---")
                             
             except Exception as e:
                 error_msg = f"❌ Error: {str(e)}"
