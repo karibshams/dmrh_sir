@@ -1,4 +1,4 @@
-from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader, JSONLoader
+from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
@@ -32,23 +32,6 @@ class DocumentProcessor:
                 print(f"✓ PDFs loaded: {len(pdf_docs)} documents")
         except Exception as e:
             print(f"⚠ PDF loading error: {e}")
-        
-        try:
-            if any(Path(self.data_path).glob("*.json")):
-                for json_file in Path(self.data_path).glob("*.json"):
-                    try:
-                        json_loader = JSONLoader(
-                            file_path=str(json_file),
-                            jq_schema='.core_courses[]',
-                            text_content_key='title'
-                        )
-                        json_docs = json_loader.load()
-                        self.documents.extend(json_docs)
-                    except Exception as je:
-                        print(f"  Skipping {json_file.name}: {je}")
-                print(f"✓ JSON files loaded: {len([d for d in self.documents if 'json' in d.metadata.get('source', '')])} documents")
-        except Exception as e:
-            print(f"⚠ JSON loading error: {e}")
         
         print(f"📊 Total documents loaded: {len(self.documents)}")
         return self.documents

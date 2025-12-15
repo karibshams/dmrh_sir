@@ -5,12 +5,12 @@ from langchain.chains import RetrievalQA
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
-
+#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
 class EWUAcademicUI:
     """Streamlit UI for EWU Academic Assistant"""
     
     def __init__(self):
-        self.groq_api_key = "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"
+        self.groq_api_key = "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"
         self.db_path = "vectorstore/db_faiss"
         self.model = "mixtral-8x7b-32768"
         

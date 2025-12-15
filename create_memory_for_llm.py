@@ -185,6 +185,6 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
                 print(f"❌ Error: {e}\n")
 
 if __name__ == "__main__":
-    api_key = "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"
+    api_key = "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"
     assistant = AcademicAssistant(groq_api_key=api_key)
     assistant.interactive_session()
