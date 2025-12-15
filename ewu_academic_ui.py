@@ -134,8 +134,8 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
         return ChatGroq(
             api_key=self.groq_api_key,
             model=self.model,
-            temperature=0.3,
-            max_tokens=1024
+            temperature=0.5,
+            max_tokens=250
         )
     
     def create_qa_chain(self, db):
