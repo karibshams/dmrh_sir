@@ -276,6 +276,30 @@ Provide a friendly, helpful answer. Use the context when relevant, but feel free
         """Initialize Streamlit session state"""
         if 'messages' not in st.session_state:
             st.session_state.messages = []
+        if 'conversations' not in st.session_state:
+            st.session_state.conversations = {}
+        if 'current_conversation_id' not in st.session_state:
+            st.session_state.current_conversation_id = None
+    
+    def create_new_conversation(self):
+        """Create a new conversation"""
+        import time
+        conv_id = f"conv_{int(time.time())}"
+        st.session_state.conversations[conv_id] = []
+        st.session_state.current_conversation_id = conv_id
+        st.session_state.messages = []
+        st.rerun()
+    
+    def load_conversation(self, conv_id):
+        """Load a specific conversation"""
+        st.session_state.current_conversation_id = conv_id
+        st.session_state.messages = st.session_state.conversations.get(conv_id, [])
+        st.rerun()
+    
+    def save_current_conversation(self):
+        """Save current conversation to history"""
+        if st.session_state.current_conversation_id:
+            st.session_state.conversations[st.session_state.current_conversation_id] = st.session_state.messages
     
     def display_chat_history(self):
         """Display chat message history in ChatGPT style"""
@@ -322,28 +346,51 @@ Provide a friendly, helpful answer. Use the context when relevant, but feel free
         
         # Sidebar
         with st.sidebar:
-            st.markdown(f"<div style='color: {self.ewu_primary}; font-size: 1.5em; font-weight: bold;'>🎓 EWU Chat</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='color: {self.ewu_primary}; font-size: 1.8em; font-weight: bold;'>💬 EWU Chat</div>", unsafe_allow_html=True)
             st.divider()
             
             # New chat button
             if st.button("+ New Chat", use_container_width=True, key="new_chat"):
-                st.session_state.messages = []
-                st.rerun()
+                self.create_new_conversation()
+            
+            st.divider()
+            
+            # Chat history
+            st.markdown("### 📚 Chat History")
+            if st.session_state.conversations:
+                for conv_id in reversed(list(st.session_state.conversations.keys())):
+                    messages = st.session_state.conversations[conv_id]
+                    if messages:
+                        # Get first user message as title
+                        first_msg = next((m["content"][:30] + "..." if len(m["content"]) > 30 else m["content"] 
+                                         for m in messages if m["role"] == "user"), "New Chat")
+                        
+                        col1, col2 = st.columns([4, 1])
+                        with col1:
+                            if st.button(first_msg, use_container_width=True, key=conv_id):
+                                self.load_conversation(conv_id)
+                        with col2:
+                            if st.button("🗑️", key=f"del_{conv_id}"):
+                                del st.session_state.conversations[conv_id]
+                                if st.session_state.current_conversation_id == conv_id:
+                                    st.session_state.current_conversation_id = None
+                                    st.session_state.messages = []
+                                st.rerun()
+            else:
+                st.markdown("*No conversations yet*")
             
             st.divider()
             
             st.markdown("### About")
             st.markdown("""
-            This is the **EWU Academic Assistant**, your AI-powered guide for:
-            - 📚 Course information
-            - 🎓 Program requirements
-            - 📋 Academic policies
-            - 👨‍🏫 Faculty details
-            """)
+            **EWU Academic Assistant**
             
-            st.divider()
-            st.markdown("**Need Help?**")
-            st.markdown("Ask about any EWU academic matters!")
+            Ask about:
+            - 📚 Courses & programs
+            - 🎓 Requirements
+            - 📋 Policies
+            - 👨‍🏫 Faculty info
+            """)
         
         # Main chat area
         st.markdown('<div class="header-title">🎓 EWU Academic Assistant</div>', unsafe_allow_html=True)
@@ -354,12 +401,17 @@ Provide a friendly, helpful answer. Use the context when relevant, but feel free
         if db is None:
             st.stop()
         
+        # Create conversation if none exists
+        if st.session_state.current_conversation_id is None:
+            self.create_new_conversation()
+        
         # Display chat history
         self.display_chat_history()
         
         # Chat input
         if prompt := st.chat_input("Ask me anything about EWU courses, programs, or policies..."):
             self.process_user_input(prompt, db)
+            self.save_current_conversation()
 
 if __name__ == "__main__":
     app = EWUAcademicUI()
