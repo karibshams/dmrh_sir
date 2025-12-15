@@ -35,29 +35,27 @@ class DocumentProcessor:
         
         try:
             if any(Path(self.data_path).glob("*.json")):
-                json_loader = DirectoryLoader(
-                    self.data_path,
-                    glob="*.json",
-                    loader_cls=JSONLoader,
-                    loader_kwargs={'jq_schema': '.', 'text_content_key': 'content'}
-                )
-                json_docs = json_loader.load()
-                self.documents.extend(json_docs)
-                print(f"✓ JSON files loaded: {len(json_docs)} documents")
+                for json_file in Path(self.data_path).glob("*.json"):
+                    try:
+                        json_loader = JSONLoader(
+                            file_path=str(json_file),
+                            jq_schema='.[]'
+                        )
+                        json_docs = json_loader.load()
+                        self.documents.extend(json_docs)
+                    except:
+                        pass
+                print(f"✓ JSON files loaded: {len([d for d in self.documents if 'json' in d.metadata.get('source', '')])} documents")
         except Exception as e:
             print(f"⚠ JSON loading error: {e}")
         
         try:
             if any(Path(self.data_path).glob("*.csv")):
-                csv_loader = DirectoryLoader(
-                    self.data_path,
-                    glob="*.csv",
-                    loader_cls=CSVLoader,
-                    loader_kwargs={'source_column': 'source'}
-                )
-                csv_docs = csv_loader.load()
-                self.documents.extend(csv_docs)
-                print(f"✓ CSV files loaded: {len(csv_docs)} documents")
+                for csv_file in Path(self.data_path).glob("*.csv"):
+                    csv_loader = CSVLoader(file_path=str(csv_file))
+                    csv_docs = csv_loader.load()
+                    self.documents.extend(csv_docs)
+                print(f"✓ CSV files loaded: {len([d for d in self.documents if 'csv' in d.metadata.get('source', '')])} documents")
         except Exception as e:
             print(f"⚠ CSV loading error: {e}")
         
