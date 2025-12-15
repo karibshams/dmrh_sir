@@ -6,12 +6,15 @@ from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
 
-class StreamlitUI:
+class EWUAcademicUI:
+    """Streamlit UI for EWU Academic Assistant"""
+    
     def __init__(self):
         self.groq_api_key = "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"
         self.db_path = "vectorstore/db_faiss"
         self.model = "mixtral-8x7b-32768"
         
+        # EWU Theme Colors
         self.ewu_primary = "#003d7a"
         self.ewu_secondary = "#0066cc"
         self.ewu_accent = "#ff6600"
@@ -44,7 +47,7 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
         self.apply_theme()
     
     def apply_theme(self):
-        """Apply EWU theme CSS"""
+        """Apply EWU theme with custom CSS"""
         st.markdown(f"""
         <style>
         :root {{
@@ -60,6 +63,7 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
             border-radius: 10px;
             padding: 15px;
             margin: 10px 0;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         }}
         .header-title {{
             color: {self.ewu_primary};
@@ -88,18 +92,27 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
             border-radius: 5px;
             margin: 20px 0;
         }}
+        .success-box {{
+            background-color: #51cf6620;
+            border-left: 4px solid #51cf66;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }}
         </style>
         """, unsafe_allow_html=True)
     
     @st.cache_resource
     def load_vectorstore(_self):
-        """Load FAISS vector store"""
+        """Load FAISS vector store with caching"""
         try:
             if not os.path.exists(_self.db_path):
                 return None
+            
             embedding_model = HuggingFaceEmbeddings(
                 model_name="sentence-transformers/all-MiniLM-L6-v2"
             )
+            
             return FAISS.load_local(
                 _self.db_path,
                 embedding_model,
@@ -110,7 +123,7 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
             return None
     
     def get_prompt_template(self):
-        """Create prompt template"""
+        """Create custom prompt template"""
         return PromptTemplate(
             template=self.custom_prompt_template.format(system_prompt=self.system_prompt),
             input_variables=["context", "question"]
@@ -126,7 +139,7 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
         )
     
     def create_qa_chain(self, db):
-        """Create QA chain"""
+        """Create RetrievalQA chain"""
         llm = self.get_llm()
         return RetrievalQA.from_chain_type(
             llm=llm,
@@ -147,7 +160,7 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
             st.markdown("""
             <div class="error-box">
             <b>⚠️ Vector Database Not Found</b><br>
-            Please run connect_memory_with_llm.py to create the vector store.
+            Please run <code>connect_memory_with_llm.py</code> to create the vector store from your documents.
             </div>
             """, unsafe_allow_html=True)
             return False
@@ -156,7 +169,7 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
             st.markdown("""
             <div class="error-box">
             <b>⚠️ API Key Missing</b><br>
-            Please configure your Groq API key.
+            Please configure your Groq API key in the code.
             </div>
             """, unsafe_allow_html=True)
             return False
@@ -183,7 +196,7 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
         
         with st.chat_message("assistant"):
             try:
-                with st.spinner("Searching documents..."):
+                with st.spinner("🔍 Searching documents..."):
                     qa_chain = self.create_qa_chain(db)
                     response = qa_chain.invoke({'query': prompt})
                     result = response["result"]
@@ -191,10 +204,11 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
                     st.markdown(result)
                     st.session_state.messages.append({"role": "assistant", "content": result})
                     
-                    with st.expander("📄 Source Documents"):
+                    with st.expander("📄 View Source Documents"):
                         for i, doc in enumerate(response["source_documents"], 1):
                             st.write(f"**Document {i}:** {doc.metadata.get('source', 'Unknown')}")
-                            st.write(f"_{doc.page_content[:200]}..._")
+                            st.write(f"_{doc.page_content[:250]}..._")
+                            st.write("---")
                             
             except Exception as e:
                 error_msg = f"❌ Error: {str(e)}"
@@ -214,9 +228,12 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
         
         db = self.load_vectorstore()
         
+        if db is None:
+            st.stop()
+        
         if prompt := st.chat_input("Ask your question about EWU programs, courses, or policies:"):
             self.process_user_input(prompt, db)
 
 if __name__ == "__main__":
-    app = StreamlitUI()
+    app = EWUAcademicUI()
     app.run()
