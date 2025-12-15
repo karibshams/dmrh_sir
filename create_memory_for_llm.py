@@ -8,7 +8,7 @@ import os
 class AcademicAssistant:
     """AI-powered Academic Assistant for East West University"""
     
-    def __init__(self, groq_api_key, db_path="vectorstore/db_faiss", model="mixtral-8x7b-32768"):
+    def __init__(self, groq_api_key, db_path="vectorstore/db_faiss", model="llama-3.3-70b-versatile"):
         self.groq_api_key = groq_api_key
         self.db_path = db_path
         self.model = model

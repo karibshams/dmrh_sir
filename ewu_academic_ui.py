@@ -12,30 +12,38 @@ class EWUAcademicUI:
     def __init__(self):
         self.groq_api_key = "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"
         self.db_path = "vectorstore/db_faiss"
-        self.model = "mixtral-8x7b-32768"
+        self.model = "llama-3.3-70b-versatile"
         
         # EWU Theme Colors
         self.ewu_primary = "#003d7a"
         self.ewu_secondary = "#0066cc"
         self.ewu_accent = "#ff6600"
         
-        self.system_prompt = """You are an AI-powered Academic Assistant for East West University.
-Your task is to answer student questions strictly using the provided academic context retrieved from official university documents.
-Use clear, concise, and student-friendly language.
-If the answer is not found in the given context, clearly say that the information is not available in the official documents.
-Do not hallucinate or assume any academic rules.
-Always prioritize accuracy, clarity, and relevance."""
+        self.system_prompt = """You are a friendly and helpful Academic Assistant for East West University.
+Your primary role is to help students with questions about:
+- Courses and their details (code, credits, prerequisites, learning outcomes)
+- Programs and degree requirements
+- Academic policies and rules
+- Faculty information
+
+Guidelines:
+1. First, check the provided context from official EWU documents for relevant information
+2. If specific information is in the context, provide it clearly with course codes and requirements
+3. If the context doesn't have complete information, supplement with your general knowledge about academic systems
+4. Be conversational, friendly, and encouraging to students
+5. If you're unsure, be honest and suggest they consult with academic advisors
+
+Always be helpful and provide useful information, whether from documents or general knowledge."""
         
         self.custom_prompt_template = """{system_prompt}
 
-Context:
+Available Context from EWU Documents:
 {{context}}
 
-Question:
+Student Question:
 {{question}}
 
-Answer the question using only the above context.
-If applicable, mention relevant rules, credits, prerequisites, or academic policies clearly."""
+Provide a friendly, helpful answer. Use the context when relevant, but feel free to provide general academic knowledge if needed."""
     
     def configure_page(self):
         """Configure Streamlit page settings"""
@@ -201,7 +209,13 @@ If applicable, mention relevant rules, credits, prerequisites, or academic polic
             try:
                 with st.spinner("🔍 Searching documents..."):
                     qa_chain = self.create_qa_chain(db)
-                    result = qa_chain.invoke(prompt)
+                    response = qa_chain.invoke(prompt)
+                    
+                    # Extract text content from response
+                    if hasattr(response, 'content'):
+                        result = response.content
+                    else:
+                        result = str(response)
                     
                     st.markdown(result)
                     st.session_state.messages.append({"role": "assistant", "content": result})
