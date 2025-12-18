@@ -1,191 +1,174 @@
+import os
+from typing import List
+
 from langchain_core.prompts import PromptTemplate
-from langchain.chains.retrieval_qa.base import RetrievalQA
+from langchain_core.runnables import RunnablePassthrough
+from langchain_core.output_parsers import StrOutputParser
+
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
-import os
 
 
 class AcademicAssistant:
-    """AI-powered Academic Assistant for East West University"""
-    
-    def __init__(self, groq_api_key, db_path="vectorstore/db_faiss", model="llama-3.3-70b-versatile"):
+    """
+    EWU Academic Assistant (Low-RAM friendly)
+    FAISS + HuggingFace small embeddings + Groq LLM
+    """
+
+    def __init__(
+        self,
+        groq_api_key: str,
+        db_path: str = "vectorstore/db_faiss",
+        model: str = "llama-3.3-70b-versatile",
+    ):
+        if not groq_api_key:
+            raise ValueError("Groq API key is required")
+
         self.groq_api_key = groq_api_key
         self.db_path = db_path
         self.model = model
+
+        self.embeddings = None
+        self.vectorstore = None
+        self.retriever = None
         self.llm = None
-        self.db = None
-        self.qa_chain = None
-        self.embedding_model = None
-        
+        self.chain = None
+
+        # ================= SYSTEM PROMPT =================
         self.system_prompt = """You are an AI-powered Academic Assistant for East West University.
-Your task is to answer student questions strictly using the provided academic context retrieved from official university documents.
-Use clear, concise, and student-friendly language.
-If the answer is not found in the given context, clearly say that the information is not available in the official documents.
-Do not hallucinate or assume any academic rules.
-Always prioritize accuracy, clarity, and relevance."""
-        
-        self.custom_prompt_template = """{system_prompt}
+Answer questions strictly using the provided academic context from official EWU documents.
+Use clear, concise language.
+If the answer is not found, say:
+"Information not available in the official documents."
+Do NOT hallucinate.
+Keep answers short and relevant.
+"""
+
+        # ================= PROMPT TEMPLATE =================
+        self.prompt = PromptTemplate(
+            template="""{system_prompt}
 
 Context:
-{{context}}
+{context}
 
 Question:
-{{question}}
+{question}
 
-Answer the question using only the above context.
-If applicable, mention relevant rules, credits, prerequisites, or academic policies clearly."""
-    
-    def load_embedding_model(self):
-        """Load HuggingFace embedding model"""
-        try:
-            print("🤖 Loading embedding model...")
-            self.embedding_model = HuggingFaceEmbeddings(
-                model_name="sentence-transformers/all-MiniLM-L6-v2"
-            )
-            print("✓ Embedding model loaded")
-            return self.embedding_model
-        except Exception as e:
-            print(f"❌ Error loading embedding model: {e}")
-            raise
-    
-    def load_vectorstore(self):
-        """Load FAISS vector store"""
-        try:
-            print("📂 Loading vector database...")
-            
-            if not os.path.exists(self.db_path):
-                raise FileNotFoundError(f"Vector store not found at {self.db_path}")
-            
-            self.db = FAISS.load_local(
-                self.db_path,
-                self.embedding_model,
-                allow_dangerous_deserialization=True
-            )
-            print("✓ Vector database loaded")
-            return self.db
-        except Exception as e:
-            print(f"❌ Error loading vector database: {e}")
-            raise
-    
-    def load_llm(self):
-        """Load Groq LLM with optimal parameters"""
-        try:
-            print("🚀 Loading Groq LLM...")
-            self.llm = ChatGroq(
-                api_key=self.groq_api_key,
-                model=self.model,
-                temperature=0.3,
-                max_tokens=1024
-            )
-            print(f"✓ LLM loaded (Model: {self.model})")
-            return self.llm
-        except Exception as e:
-            print(f"❌ Error loading LLM: {e}")
-            raise
-    
-    def get_prompt_template(self):
-        """Create custom prompt template"""
-        return PromptTemplate(
-            template=self.custom_prompt_template.format(system_prompt=self.system_prompt),
-            input_variables=["context", "question"]
+Answer using ONLY the context above.
+""",
+            input_variables=["system_prompt", "context", "question"],
         )
-    
-    def create_qa_chain(self):
-        """Create RetrievalQA chain"""
-        try:
-            print("⛓️  Creating QA chain...")
-            self.qa_chain = RetrievalQA.from_chain_type(
-                llm=self.llm,
-                chain_type="stuff",
-                retriever=self.db.as_retriever(search_kwargs={'k': 3}),
-                return_source_documents=True,
-                chain_type_kwargs={'prompt': self.get_prompt_template()}
-            )
-            print("✓ QA chain created")
-            return self.qa_chain
-        except Exception as e:
-            print(f"❌ Error creating QA chain: {e}")
-            raise
-    
-    def initialize(self):
-        """Initialize all components"""
-        try:
-            print("\n" + "=" * 60)
-            print("🔧 Initializing Academic Assistant")
-            print("=" * 60 + "\n")
-            
-            self.load_embedding_model()
-            self.load_vectorstore()
-            self.load_llm()
-            self.create_qa_chain()
-            
-            print("\n" + "=" * 60)
-            print("✅ Assistant initialized successfully!")
-            print("=" * 60 + "\n")
-            
-        except Exception as e:
-            print(f"\n❌ Initialization failed: {e}")
-            raise
-    
-    def query(self, question):
-        """Process a user query and return answer with sources"""
-        try:
-            if not self.qa_chain:
-                raise ValueError("QA chain not initialized. Call initialize() first.")
-            
-            response = self.qa_chain.invoke({'query': question})
-            return {
-                'answer': response["result"],
-                'sources': response["source_documents"]
+
+    # --------------------------------------------------
+    # LOAD COMPONENTS
+    # --------------------------------------------------
+
+    def load_embeddings(self):
+        print("🤖 Loading embeddings (low-RAM)...")
+        # Use small CPU-friendly embedding
+        self.embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/paraphrase-MiniLM-L3-v2"
+        )
+
+    def load_vectorstore(self):
+        print("📂 Loading FAISS index...")
+        if not os.path.exists(self.db_path):
+            raise FileNotFoundError(f"Vectorstore not found: {self.db_path}")
+
+        self.vectorstore = FAISS.load_local(
+            self.db_path,
+            self.embeddings,
+            allow_dangerous_deserialization=True,
+        )
+
+        self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": 3})
+
+    def load_llm(self):
+        print("🚀 Loading Groq LLM...")
+        self.llm = ChatGroq(
+            api_key=self.groq_api_key,
+            model=self.model,
+            temperature=0.3,
+            max_tokens=800,
+        )
+
+    # --------------------------------------------------
+    # CHAIN
+    # --------------------------------------------------
+
+    def format_docs(self, docs: List):
+        return "\n\n".join(doc.page_content for doc in docs)
+
+    def build_chain(self):
+        print("⛓️ Building LCEL chain...")
+        self.chain = (
+            {
+                "context": self.retriever | self.format_docs,
+                "question": RunnablePassthrough(),
+                "system_prompt": lambda _: self.system_prompt,
             }
-        except Exception as e:
-            print(f"❌ Error processing query: {e}")
-            raise
-    
-    def format_output(self, result):
-        """Format query result for display"""
-        output = "\n" + "=" * 60
-        output += "\n📝 ANSWER:\n"
-        output += result['answer']
-        output += "\n\n" + "-" * 60
-        output += "\n📄 SOURCE DOCUMENTS:\n"
-        
-        for i, doc in enumerate(result['sources'], 1):
-            output += f"\n{i}. {doc.metadata.get('source', 'Unknown')}\n"
-            output += f"   {doc.page_content[:150]}...\n"
-        
-        output += "=" * 60 + "\n"
-        return output
-    
+            | self.prompt
+            | self.llm
+            | StrOutputParser()
+        )
+
+    # --------------------------------------------------
+    # INITIALIZATION
+    # --------------------------------------------------
+
+    def initialize(self):
+        print("\n" + "=" * 60)
+        print("🔧 Initializing EWU Academic Assistant")
+        print("=" * 60)
+
+        self.load_embeddings()
+        self.load_vectorstore()
+        self.load_llm()
+        self.build_chain()
+
+        print("✅ Assistant ready\n")
+
+    # --------------------------------------------------
+    # QUERY
+    # --------------------------------------------------
+
+    def query(self, question: str):
+        return self.chain.invoke(question)
+
+    # --------------------------------------------------
+    # INTERACTIVE SESSION
+    # --------------------------------------------------
+
     def interactive_session(self):
-        """Run interactive Q&A session"""
         self.initialize()
-        print("Type 'quit' or 'exit' to end session\n")
-        
+        print("Type 'exit' to quit\n")
+
         while True:
             try:
-                question = input("❓ Question: ").strip()
-                
-                if question.lower() in ['quit', 'exit', 'q']:
-                    print("\n👋 Thank you for using EWU Academic Assistant!")
+                q = input("❓ Question: ").strip()
+                if q.lower() in {"exit", "quit", "q"}:
+                    print("\n👋 Session ended")
                     break
-                
-                if not question:
-                    print("⚠️  Please enter a valid question\n")
+                if not q:
                     continue
-                
-                result = self.query(question)
-                output = self.format_output(result)
-                print(output)
-                
+
+                answer = self.query(q)
+                print("\n📝 ANSWER:\n", answer, "\n")
+
             except KeyboardInterrupt:
-                print("\n\n👋 Session ended!")
+                print("\n👋 Session ended")
                 break
             except Exception as e:
                 print(f"❌ Error: {e}\n")
 
+
+# --------------------------------------------------
+# MAIN
+# --------------------------------------------------
+
 if __name__ == "__main__":
-    api_key = "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"
-    assistant = AcademicAssistant(groq_api_key=api_key)
+    GROQ_API_KEY = "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"
+
+    assistant = AcademicAssistant(GROQ_API_KEY)
     assistant.interactive_session()
