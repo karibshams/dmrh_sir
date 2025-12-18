@@ -1,9 +1,10 @@
 from langchain_core.prompts import PromptTemplate
-from langchain.chains import RetrievalQA
+from langchain.chains.retrieval_qa.base import RetrievalQA
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_community.vectorstores import FAISS
 from langchain_groq import ChatGroq
 import os
+
 
 class AcademicAssistant:
     """AI-powered Academic Assistant for East West University"""
